@@ -1,78 +1,56 @@
-import ping, getopt, sys, os, socket
+import getopt, sys, os, socket, urllib2, datetime
 
-version="1.0"
-version_full="scan-network v."+version
+keywords = ['pass', 'root']
 
-def usage():
-	'Shows program usage and version, lists all options'
-
-	print version_full+" for GNU/Linux. A simple local network scanner."
-	print "Usage: scan-network [long GNU option] [option] from [option] to"
-	print ""
-	print " --from range of ip adresses to start"
-	print " --to range of ip adresses where to end"
-	print " --ip mask of adresses to scan, for example 192.168.1, default 192.168.1"
-	print " --help this screen"
+def CheckAxisURL(address,passwd):
+    cameraurl = 'http://' + address + '/axis-cgi/param.cgi?action=list&group=root.Brand.ProdNbr'
+    errorcode = ''
+    try:
+        passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        passman.add_password(None, cameraurl, 'root', passwd)
+        urllib2.install_opener(urllib2.build_opener(urllib2.HTTPDigestAuthHandler(passman)))
+        f = urllib2.urlopen(cameraurl, timeout=3)
+        cameramodel = f.read().split('=')
+        f.close()
+    except socket.timeout as e:
+        errorcode = "Connection Timeout"
+    except urllib2.HTTPError, e:
+        if e.code == 404:
+            errorcode = "Page not found"
+        elif e.code == 403:
+            errorcode = "Access denied"
+        elif e.code == 401:
+            errorcode = "Bad password"
+        else:
+            errorcode = "Something else happened"
+    except urllib2.URLError:
+        errorcode = "URL Error"
+    if errorcode:
+		# print errorcode
+		# print cameraurl
+		return False
+    else:
+		# print "Camera Found - Address: "+address+" Pass:"+passwd
+		# print address+" - "+passwd
+		return True
 
 def main():
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], "ft:h", ["from=", "to=", "help", "delay=", "ip="]) # output=
 
-	except getopt.GetoptError, err:
-		print "Error: "+str(err)+", Try --help for usage\n\n"
-		# usage()
-		sys.exit(2)
-
-	x=0
-	y=0
-	ip="192.168.1"
+	subnet = raw_input("Please enter subnet to scan: ")
 	ping_delay=1 # in seconds
 
-	for o, a in opts:
-		if o in ("-h", "--help"):
-			usage()
-			sys.exit()
-		if o == "--from":
-			try:
-				x=float(a)
-			except ValueError:
-				print "--from argument is taking only numeric values"
-				sys.exit(2);
+	cvs_export = open(subnet+ '.csv', 'w+')
+	cvs_export.write("HardwareAddress,HardwarePort,HardwareUsername,HardwarePassword,HardwareDriverID\n")
 
-		if o == "--to":
-			try:
-				y=float(a)
-			except ValueError:
-				print "--to argument is taking only numeric values"
-				sys.exit(2);
+	i=int(10)
 
-		if o == "--delay":
-			try:
-				ping_delay=float(a)
-			except ValueError:
-				print "--delay argument is taking only numeric values"
-				sys.exit(2);
+	while i != 20:
+		for passwd in keywords:
+			if CheckAxisURL(subnet+"."+str(i),passwd):
+				print "Found Camera at: "+subnet+"."+str(i)
+				cvs_export.write(subnet+"."+str(i)+",80,root,"+passwd+",\n")
+		i=i+1
+	cvs_export.close
 
-		if o == "--ip":
-			ip=a
-
-	i=int(x)
-	to=int(y)
-
-	if (y-x) > 0:
-		print "Adresses to scan: %1.0f" % (y-x)
-		print "Ping "+ip+".{%1.0f to %1.0f}" % (x,y)
-		print "Delay: "+str(ping_delay)
-
-		to=to+1
-
-		while i != to:
-			try:
-				respond_time = ping.do_one(ip+"."+str(i), float(ping_delay))
-
-				if respond_time == None:
-					print ip+"."+str(i)+" not responding, offline"
-				else:
-					print ip+"."+str(i)+" responds in "+str(respond_time)
-			except socket.gaierror, e:
-				print "Ping failed. (socket error: '%s')" % e[1]    
+if __name__ == "__main__":
+    main()
