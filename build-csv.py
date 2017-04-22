@@ -42,9 +42,9 @@ def main():
 	cvs_export = open(subnet+ '.csv', 'w+')
 	cvs_export.write("HardwareAddress,HardwarePort,HardwareUsername,HardwarePassword,HardwareDriverID\n")
 
-	i=int(10)
+	i=int(2)
 
-	while i != 20:
+	while i != 250:
 		for passwd in keywords:
 			if CheckAxisURL(subnet+"."+str(i),passwd):
 				print "Found Camera at: "+subnet+"."+str(i)
